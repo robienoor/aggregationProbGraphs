@@ -1,6 +1,7 @@
 import numpy as np
 import itertools
 import warnings, math
+from itertools import product, chain
 warnings.filterwarnings('ignore')
 
 def getInOutArgs(argMtx):
@@ -46,8 +47,6 @@ def calculateGroundedExtension(argMtx):
 
 def generatePermutations(posArgs, negArgs):
 
-    from itertools import product, chain
-
     posPerms = np.array(list(itertools.product([0,1], repeat=len(posArgs)*len(negArgs))))
     negPerms = np.array(list(itertools.product([0,1], repeat=len(negArgs)*len(posArgs))))
 
@@ -76,7 +75,6 @@ def generatePermutations(posArgs, negArgs):
     allPerms[:,negIdxs] = allPermsList[:,(len(posArgs)*len(negArgs)):]
 
     return allPerms
-
 
 
 def calculateProbabilityDistribution(posArgs, negArgs, rating):
@@ -109,6 +107,38 @@ def calculateProbabilityDistribution(posArgs, negArgs, rating):
 
 
 def generateGraphsGivenSetsOfArgs(posArgs, negArgs):
+
+    superAllPermutations = []
+
+    # This is with all the memebers in
+    allPermutations = generatePermutations(posArgs, negArgs)
+    superAllPermutations.extend(allPermutations)
+
+    totalArgs = posArgs + negArgs
+    noArgs = len(totalArgs)
+    removeList = list(range(1, len(totalArgs)))
+
+    # start removing members
+    for x in removeList:
+
+        removeargs = list(itertools.combinations(totalArgs, x))
+
+        for args in removeargs:
+            bigCopy = np.copy(allPermutations)
+
+            for arg in args:
+                colsDel = np.arange(0, (noArgs * noArgs) - 1, noArgs) + arg
+                rowsDel = np.arange(0, noArgs) + (noArgs * arg)
+                allrc = np.concatenate((colsDel, rowsDel), axis=0)
+                print(bigCopy[allrc])
+                bigCopy[:, allrc] = np.inf
+
+            superAllPermutations.extend(bigCopy)
+
+    return superAllPermutations
+
+# Same as generateGraphsGivenSetsOfArgs except rearranged order so graphs with less args sit at bottom of list
+def generateGraphsGivenSetsOfArgsRearranged(posArgs, negArgs):
 
     superAllPermutations = []
 
@@ -220,8 +250,17 @@ def getGroundedExtensionMixedGraphSize(g, posArgs, negArgs):
     return list(groundedExtensionFullSize)
 
 
-h = [  0.,   0.,   0.,   0.,   0.,   0.,   0.,   1.,   0.]
-posArgs = [0,1]
-negArgs = [2]
+def arrangeEveryGragph(everyGraph):
 
-getGroundedExtensionMixedGraphSize(h, posArgs, negArgs)
+    # This returns a True False Array where the condition matches
+    everyGraphInfCountPerRowBools = everyGraph == np.inf
+    # This is a summing of Trues
+    everyGraphInfCounPerRowInts = (np.array(everyGraphInfCountPerRowBools)).sum(axis=1)
+    # Appending the counts to the end of every graph array so can rearrange
+    reArrangedEveryGraph = np.c_[everyGraph, everyGraphInfCounPerRowInts]
+    # Sort the everygraph by the inf Count
+    reArrangedEveryGraph = reArrangedEveryGraph[reArrangedEveryGraph[:, -1].argsort()]
+    # Delete final column (count infs col) as we dont need it anymore
+    reArrangedEveryGraph = np.delete(reArrangedEveryGraph, -1, axis=1)
+
+    return reArrangedEveryGraph
